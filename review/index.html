@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>声呐复核台 · 水下考古潜水记录</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, "PingFang SC", sans-serif; background: #e8f2f3; color: #183035; }
+    header { padding: 16px 24px; background: #fff; border-bottom: 1px solid #c9dadc; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    h1 { margin: 0; font-size: 22px; }
+    h2 { margin: 4px 0 10px; font-size: 16px; }
+    button { border: 0; border-radius: 8px; padding: 9px 12px; background: #1d6c78; color: #fff; font-weight: 800; cursor: pointer; font: inherit; }
+    button.secondary { background: #64777b; }
+    button.danger { background: #a8443c; }
+    input, select, textarea { width: 100%; border: 1px solid #c9dadc; border-radius: 6px; padding: 8px; font: inherit; background: #fff; }
+    label { display: block; margin: 8px 0 4px; color: #5c7378; font-size: 13px; }
+    .app { display: grid; grid-template-columns: 340px 1fr 1fr; gap: 14px; padding: 14px; align-items: start; }
+    .panel { background: #fff; border: 1px solid #c9dadc; border-radius: 8px; padding: 14px; }
+    .scroll { display: grid; gap: 10px; max-height: calc(100vh - 150px); overflow: auto; }
+    .card { border: 1px solid #d7e4e5; border-radius: 8px; padding: 10px; background: #fbfdfd; }
+    .card-head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+    .kv { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 2px 0; }
+    .kv > span { color: #5c7378; }
+    .pill { display: inline-block; padding: 2px 8px; border: 1px solid #c9dadc; border-radius: 999px; font-size: 12px; white-space: nowrap; }
+    .pill.ok { color: #176340; border-color: #9bc9b0; background: #edf8f1; }
+    .pill.warn { color: #8a5a12; border-color: #e0c489; background: #fdf6e5; }
+    .pill.bad { color: #8f2e28; border-color: #dca39e; background: #fbf0ef; }
+    .pill.neutral { color: #5c7378; border-color: #c9dadc; background: #f2f6f6; }
+    .note { margin-top: 6px; font-size: 12px; }
+    .muted { color: #5c7378; font-size: 12px; }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+    .actions.grid { display: grid; grid-template-columns: 1fr 1fr; }
+    .actions.grid input { grid-column: 1 / -1; }
+    .actions.grid button { width: 100%; }
+    .diff { display: grid; gap: 4px; margin: 4px 0; }
+    .diffrow { display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; align-items: baseline; font-size: 13px; }
+    .diffrow > span { color: #5c7378; }
+    .diffrow s { color: #8f2e28; text-decoration-color: #dca39e; }
+    .diffrow .arrow { color: #176340; }
+    .history { margin-top: 6px; display: grid; gap: 6px; }
+    .hist { border-left: 3px solid #c9dadc; padding-left: 8px; font-size: 12px; }
+    .empty { padding: 14px; text-align: center; }
+    details { margin-top: 6px; }
+    summary { cursor: pointer; }
+    .toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 16px); background: #183035; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 14px; opacity: 0; pointer-events: none; transition: all .2s; max-width: 90vw; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.error { background: #8f2e28; }
+    @media (max-width: 1100px) { .app { grid-template-columns: 1fr; } .scroll { max-height: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>声呐复核台</h1>
+      <div class="muted">登记声呐异常目标 → 复核裁决 → 生成下水任务。重传同线同编号沿用首次结果，资料变化先待复核。</div>
+    </div>
+    <div class="actions" style="margin:0">
+      <a class="secondary" href="../index.html" style="text-decoration:none;border-radius:8px;padding:9px 12px;background:#64777b;color:#fff;font-weight:800;font-size:14px">返回平面图</a>
+      <button id="exportBtn">导出JSON</button>
+    </div>
+  </header>
+  <main class="app">
+    <section class="panel">
+      <h2>登记 / 重传目标</h2>
+      <form id="contactForm">
+        <label>测线号</label>
+        <input name="line" placeholder="例如 L-03" required>
+        <label>目标编号</label>
+        <input name="target" placeholder="例如 M-017" required>
+        <label>坐标（经度, 纬度）</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input name="lon" placeholder="经度 122.1042" inputmode="decimal" required>
+          <input name="lat" placeholder="纬度 28.7311" inputmode="decimal" required>
+        </div>
+        <label>置信等级</label>
+        <select name="confidence" required>
+          <option id="confidenceDefault" value="" selected disabled>请选择</option>
+          <option value="high">高</option>
+          <option value="medium">中</option>
+          <option value="low">低</option>
+        </select>
+        <label>水深（选填）</label>
+        <input name="depth" placeholder="例如 17.8m">
+        <label>资料备注（不参与变化比对）</label>
+        <textarea name="note" placeholder="例如 复扫回波增强"></textarea>
+        <div class="actions"><button style="width:100%">提交复核</button></div>
+      </form>
+    </section>
+    <section class="panel">
+      <h2>待复核队列</h2>
+      <div id="queue" class="scroll"></div>
+    </section>
+    <section class="panel" style="display:grid;gap:14px">
+      <div>
+        <h2>下水任务</h2>
+        <form id="taskForm" class="card" style="background:#fbfdfd">
+          <label>接触点（复核通过后可选）</label>
+          <select id="contactSelect" name="contactId" required></select>
+          <label>潜次</label>
+          <input name="dive" placeholder="例如 DIVE-06" required>
+          <label>申报人</label>
+          <input name="applicant" placeholder="例如 周明远" required>
+          <div class="actions"><button style="width:100%">生成下水任务</button></div>
+        </form>
+        <div id="taskList" class="scroll" style="max-height:300px;margin-top:10px"></div>
+      </div>
+      <div>
+        <h2>接触点台账</h2>
+        <div id="ledger" class="scroll" style="max-height:260px"></div>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast"></div>
+  <script src="judgment.js"></script>
+  <script src="tasks.js"></script>
+  <script src="page.js"></script>
+</body>
+</html>
